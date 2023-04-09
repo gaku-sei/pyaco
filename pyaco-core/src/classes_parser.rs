@@ -81,7 +81,7 @@ impl<'i> AtRuleParser<'i> for ClassesParser {
         }
 
         // "media" is the only @rule we'll parse the body in the `parse_block` function.
-        Ok(matches!(name.as_ref(), "media"))
+        Ok(name.as_ref() == "media")
     }
 
     fn parse_block<'t>(

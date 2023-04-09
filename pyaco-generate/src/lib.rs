@@ -1,17 +1,17 @@
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 
-use std::{convert::TryInto, path::Path, time::Duration};
+use std::{
+    convert::TryInto,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use clap::Parser as ClapParser;
-use notify::{ReadDirectoryChangesWatcher, RecursiveMode};
-use notify_debouncer_mini::{new_debouncer, DebouncedEvent, Debouncer};
-use pyaco_core::{
-    resolve_path, Elm, InputType, Lang, LangTemplate, Purescript, Rescript, RescriptType,
-    Rescripti, Typescript, TypescriptType1, TypescriptType2,
-};
+use notify::RecursiveMode;
+use pyaco_core::{async_debounced_watcher, InputType, Lang};
 use serde::Deserialize;
-use tokio::{fs::create_dir_all, runtime::Handle, sync::mpsc};
+use tokio::fs::create_dir_all;
 use tracing::{enabled, info, warn, Level};
 
 pub use crate::errors::*;
@@ -26,7 +26,7 @@ pub struct Options {
 
     /// Directory for generated code
     #[clap(short, long, default_value = "./")]
-    pub output_directory: String,
+    pub output_directory: PathBuf,
 
     /// Filename (without extension) used for the generated code
     #[clap(short = 'f', long)]
@@ -62,16 +62,19 @@ pub async fn run(options: Options) -> Result<()> {
         }
     };
 
-    info!("Creating directory {} if needed", options.output_directory);
+    info!(
+        "Creating directory {} if needed",
+        options.output_directory.to_string_lossy()
+    );
 
-    create_dir_all(options.output_directory.as_str()).await?;
+    create_dir_all(&options.output_directory).await?;
 
     // Always run at least once, even in watch mode
     run_once(
         &input,
         &options.lang,
-        options.output_directory.as_str(),
-        options.output_filename.as_str(),
+        &options.output_directory,
+        &options.output_filename,
     )
     .await?;
 
@@ -80,8 +83,8 @@ pub async fn run(options: Options) -> Result<()> {
             run_watch(
                 path,
                 &options.lang,
-                options.output_directory.as_str(),
-                options.output_filename.as_str(),
+                &options.output_directory,
+                &options.output_filename,
                 options.watch_debounce_duration,
             )
             .await?;
@@ -94,68 +97,12 @@ pub async fn run(options: Options) -> Result<()> {
 async fn run_once(
     input: &InputType,
     lang: &Lang,
-    output_directory: &str,
+    output_directory: &Path,
     output_filename: &str,
 ) -> Result<()> {
-    let classes = input.extract_classes().await?;
-
-    match lang {
-        Lang::Elm => {
-            let template = Elm::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "elm"))
-                .await?;
-        }
-        Lang::Purescript => {
-            let template = Purescript::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "purs"))
-                .await?;
-        }
-        Lang::Rescript => {
-            let template = Rescript::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "res"))
-                .await?;
-
-            let template = Rescripti::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "resi"))
-                .await?;
-        }
-        Lang::RescriptType => {
-            let template = RescriptType::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "res"))
-                .await?;
-        }
-        Lang::Typescript => {
-            let template = Typescript::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "ts"))
-                .await?;
-        }
-        Lang::TypescriptType1 => {
-            let template = TypescriptType1::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "ts"))
-                .await?;
-        }
-        Lang::TypescriptType2 => {
-            let template = TypescriptType2::new(output_directory, output_filename, &classes)?;
-
-            template
-                .write_to_file(resolve_path(output_directory, output_filename, "ts"))
-                .await?;
-        }
-    }
+    let allowed_classes = input.extract_classes().await?;
+    lang.render_to_file(output_directory, output_filename, &allowed_classes)
+        .await?;
 
     Ok(())
 }
@@ -163,7 +110,7 @@ async fn run_once(
 async fn run_watch(
     path: &Path,
     lang: &Lang,
-    output_directory: &str,
+    output_directory: &Path,
     output_filename: &str,
     watch_debounce_duration: u64,
 ) -> Result<()> {
@@ -171,7 +118,7 @@ async fn run_watch(
         async_debounced_watcher(Duration::from_millis(watch_debounce_duration))?;
     debouncer
         .watcher()
-        .watch(path.as_ref(), RecursiveMode::NonRecursive)?;
+        .watch(path, RecursiveMode::NonRecursive)?;
 
     while let Some(event) = rx.recv().await {
         match event {
@@ -189,22 +136,4 @@ async fn run_watch(
     }
 
     Ok(())
-}
-
-#[allow(clippy::type_complexity)]
-fn async_debounced_watcher(
-    timeout: Duration,
-) -> Result<(
-    Debouncer<ReadDirectoryChangesWatcher>,
-    mpsc::Receiver<std::result::Result<Vec<DebouncedEvent>, Vec<notify::Error>>>,
-)> {
-    let (tx, rx) = mpsc::channel(1);
-
-    let debouncer = new_debouncer(timeout, None, move |res| {
-        Handle::current().block_on(async {
-            tx.send(res).await.unwrap();
-        });
-    })?;
-
-    Ok((debouncer, rx))
 }

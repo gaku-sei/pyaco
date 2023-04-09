@@ -4,7 +4,6 @@
 use std::{
     collections::HashSet,
     convert::TryFrom,
-    ffi::OsStr,
     path::{Path, PathBuf},
 };
 
@@ -16,12 +15,12 @@ use url::Url;
 
 use crate::classes_parser::ClassesParser;
 
-pub use crate::errors::*;
-pub use crate::lang::*;
+pub use crate::{errors::*, lang::*, notify::async_debounced_watcher};
 
 mod classes_parser;
 mod errors;
 mod lang;
+mod notify;
 mod utils;
 
 #[derive(Debug)]
@@ -110,14 +109,11 @@ fn extract_classes_from_text(css_text: impl AsRef<str>) -> Result<HashSet<Compac
     Ok(out_classes)
 }
 
-pub fn resolve_path(
-    directory: impl AsRef<OsStr>,
-    filename: impl AsRef<Path>,
-    extension: &str,
-) -> String {
-    let output_path = Path::new(&directory).join(filename);
+#[must_use]
+pub fn resolve_path(directory: &Path, filename: &str, extension: &str) -> PathBuf {
+    let mut path = directory.join(filename);
 
-    let output_path = output_path.to_string_lossy();
+    path.set_extension(extension);
 
-    format!("{output_path}.{extension}")
+    path
 }

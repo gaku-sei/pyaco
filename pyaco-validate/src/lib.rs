@@ -17,12 +17,11 @@ use glob::glob;
 use grep_matcher::{Captures, Matcher};
 use grep_regex::RegexMatcher;
 use grep_searcher::{sinks::UTF8, SearcherBuilder};
-use notify::{ReadDirectoryChangesWatcher, RecursiveMode};
-use notify_debouncer_mini::{new_debouncer, DebouncedEvent, Debouncer};
-use pyaco_core::InputType;
+use notify::RecursiveMode;
+use pyaco_core::{async_debounced_watcher, InputType};
 use regex::Regex;
 use serde::Deserialize;
-use tokio::{fs::File, runtime::Handle, sync::mpsc};
+use tokio::fs::File;
 use tracing::{error, info};
 
 pub use crate::errors::*;
@@ -68,9 +67,9 @@ pub struct Options {
 
 #[allow(clippy::missing_errors_doc)]
 pub async fn run(options: Options) -> Result<()> {
-    let capture_regex = Arc::new(RegexMatcher::new(options.capture_regex.as_str())?);
+    let capture_regex = Arc::new(RegexMatcher::new(&options.capture_regex)?);
 
-    let split_regex = Arc::new(Regex::new(options.split_regex.as_str())?);
+    let split_regex = Arc::new(Regex::new(&options.split_regex)?);
 
     info!(
         "Validating {} against {}",
@@ -79,7 +78,7 @@ pub async fn run(options: Options) -> Result<()> {
 
     let css_input = options.css_input.as_str().try_into()?;
 
-    let glob_pattern = glob::Pattern::new(options.input_glob.as_str())?;
+    let glob_pattern = glob::Pattern::new(&options.input_glob)?;
 
     run_once(
         glob(glob_pattern.as_str())?.filter_map(std::result::Result::ok),
@@ -236,22 +235,4 @@ pub async fn open_file(path: impl AsRef<Path>) -> Result<File> {
 
         err.into()
     })
-}
-
-#[allow(clippy::type_complexity)]
-fn async_debounced_watcher(
-    timeout: Duration,
-) -> Result<(
-    Debouncer<ReadDirectoryChangesWatcher>,
-    mpsc::Receiver<std::result::Result<Vec<DebouncedEvent>, Vec<notify::Error>>>,
-)> {
-    let (tx, rx) = mpsc::channel(1);
-
-    let debouncer = new_debouncer(timeout, None, move |res| {
-        Handle::current().block_on(async {
-            tx.send(res).await.unwrap();
-        });
-    })?;
-
-    Ok((debouncer, rx))
 }
