@@ -10,7 +10,6 @@ clap.workspace = true
 compact_str.workspace = true
 tracing.workspace = true
 notify.workspace = true
-notify-debouncer-mini.workspace = true
 pyaco-core.workspace = true
 serde.workspace = true
 thiserror.workspace = true

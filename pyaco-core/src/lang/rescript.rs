@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::Path};
 
 use askama::Template;
 use compact_str::CompactString;
@@ -15,7 +15,7 @@ pub struct Rescript<'a> {
 
 impl<'a> LangTemplate<'a> for Rescript<'a> {
     fn new(
-        _output_directory: &'a str,
+        _output_directory: &'a Path,
         _output_filename: &'a str,
         classes: &'a HashSet<CompactString>,
     ) -> Result<Self> {
@@ -31,7 +31,7 @@ pub struct Rescripti<'a> {
 
 impl<'a> LangTemplate<'a> for Rescripti<'a> {
     fn new(
-        _output_directory: &'a str,
+        _output_directory: &'a Path,
         _output_filename: &'a str,
         classes: &'a HashSet<CompactString>,
     ) -> Result<Self> {

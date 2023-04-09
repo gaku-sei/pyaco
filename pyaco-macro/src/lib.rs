@@ -101,12 +101,10 @@ fn init_config() -> Config {
         process::exit(1);
     }
 
-    let config = toml::from_str(content.as_str()).unwrap_or_else(|err| {
+    toml::from_str(&content).unwrap_or_else(|err| {
         error!("pyaco.toml configuration is invalid: {err}");
         process::exit(1);
-    });
-
-    config
+    })
 }
 
 fn init_accepted_classes() -> HashSet<CompactString> {

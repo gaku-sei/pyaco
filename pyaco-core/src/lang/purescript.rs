@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, path::Path};
 
 use askama::Template;
 use compact_str::CompactString;
@@ -16,15 +16,13 @@ pub struct Purescript<'a> {
 
 impl<'a> LangTemplate<'a> for Purescript<'a> {
     fn new(
-        output_directory: &'a str,
+        output_directory: &'a Path,
         output_filename: &'a str,
         classes: &'a HashSet<CompactString>,
     ) -> Result<Self> {
-        let module_name = generate_module_name(output_directory, output_filename)?;
-
         Ok(Purescript {
             classes,
-            module_name,
+            module_name: generate_module_name(output_directory, output_filename)?,
         })
     }
 }

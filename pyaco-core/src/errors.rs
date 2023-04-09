@@ -11,6 +11,9 @@ pub enum Error {
 
     #[error("ureq error: {0}")]
     Ureq(#[from] Box<ureq::Error>),
+
+    #[error("notify error: {0}")]
+    Notify(#[from] notify::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

@@ -1,6 +1,4 @@
-use std::{
-    borrow::Cow, collections::HashSet, fmt::Display, path::Component, path::Path, str::FromStr,
-};
+use std::{borrow::Cow, collections::HashSet, path::Component, path::Path, str::FromStr};
 
 use askama::Template;
 use async_trait::async_trait;
@@ -10,6 +8,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::info;
 
+use crate::resolve_path;
 use crate::Result;
 
 pub use super::elm::Elm;
@@ -41,6 +40,76 @@ pub enum Lang {
     TypescriptType2,
 }
 
+impl Lang {
+    #[allow(clippy::missing_errors_doc)]
+    pub async fn render_to_file(
+        self,
+        output_directory: &Path,
+        output_filename: &str,
+        classes: &HashSet<CompactString>,
+    ) -> Result<()> {
+        match self {
+            Self::Elm => {
+                let template = Elm::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "elm"))
+                    .await?;
+            }
+            Self::Purescript => {
+                let template = Purescript::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "purs"))
+                    .await?;
+            }
+            Self::Rescript => {
+                let template = Rescript::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "res"))
+                    .await?;
+
+                let template = Rescripti::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "resi"))
+                    .await?;
+            }
+            Self::RescriptType => {
+                let template = RescriptType::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "res"))
+                    .await?;
+            }
+            Self::Typescript => {
+                let template = Typescript::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "ts"))
+                    .await?;
+            }
+            Self::TypescriptType1 => {
+                let template = TypescriptType1::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "ts"))
+                    .await?;
+            }
+            Self::TypescriptType2 => {
+                let template = TypescriptType2::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "ts"))
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl FromStr for Lang {
     type Err = String;
 
@@ -67,13 +136,13 @@ pub trait LangTemplate<'a>: Template + Sized {
     ///
     /// A template creation typically fails when the directory/filenames are not present or can't be accessed
     fn new(
-        output_directory: &'a str,
+        output_directory: &'a Path,
         output_filename: &'a str,
         classes: &'a HashSet<CompactString>,
     ) -> Result<Self>;
 
-    async fn write_to_file(&self, path: impl AsRef<Path> + Display + Send) -> Result<()> {
-        info!("Writing code into {}", path);
+    async fn write_to_file(&self, path: &Path) -> Result<()> {
+        info!("Writing code into {}", path.to_string_lossy());
 
         let code = self.render()?;
 
@@ -87,14 +156,12 @@ pub trait LangTemplate<'a>: Template + Sized {
 
 /// Used by Elm and PureScript to generate their module name based on the directory and the filename
 pub(crate) fn generate_module_name<'a>(
-    output_directory: &'a str,
+    output_directory: &'a Path,
     output_filename: &'a str,
 ) -> Result<Cow<'a, str>> {
-    let path = Path::new(output_directory);
-
-    let base = path
-        .components()
-        .try_fold("".into(), |acc, component| -> Result<Cow<'a, str>> {
+    let base = output_directory.components().try_fold(
+        "".into(),
+        |acc, component| -> Result<Cow<'a, str>> {
             if let Component::Normal(part) = component {
                 let part = part.to_string_lossy();
 
@@ -106,7 +173,8 @@ pub(crate) fn generate_module_name<'a>(
             }
 
             Ok(acc)
-        })?;
+        },
+    )?;
 
     if base.is_empty() {
         return Ok(output_filename.into());
