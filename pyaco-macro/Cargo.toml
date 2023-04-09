@@ -9,7 +9,6 @@ authors.workspace = true
 proc-macro = true
 
 [dependencies]
-anyhow.workspace = true
 compact_str.workspace = true
 once_cell.workspace = true
 proc-macro-error.workspace = true
