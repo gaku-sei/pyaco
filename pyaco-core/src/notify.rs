@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use notify::ReadDirectoryChangesWatcher;
+use notify::FsEventWatcher;
 use notify_debouncer_mini::{new_debouncer, DebouncedEvent, Debouncer};
 use tokio::{runtime::Handle, sync::mpsc};
 
@@ -14,7 +14,7 @@ use crate::Result;
 pub fn async_debounced_watcher(
     timeout: Duration,
 ) -> Result<(
-    Debouncer<ReadDirectoryChangesWatcher>,
+    Debouncer<FsEventWatcher>,
     mpsc::Receiver<std::result::Result<Vec<DebouncedEvent>, Vec<notify::Error>>>,
 )> {
     let (tx, rx) = mpsc::channel(1);
