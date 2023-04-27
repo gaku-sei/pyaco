@@ -13,7 +13,7 @@ release: setup
 	mkdir -p releases
 
 	# Build node native binary for unsupported platforms
-	yarn release-pyaco-node
+	yarn build
 
 	# Add targets for cross compilation
 	rustup target add x86_64-apple-darwin
