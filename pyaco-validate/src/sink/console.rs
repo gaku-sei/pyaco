@@ -21,18 +21,23 @@ impl Console {
     pub fn new(quiet: bool) -> Self {
         let (sender, mut receiver) = mpsc::unbounded_channel::<SearchFileEvent>();
         let valid = Arc::new(AtomicBool::new(true));
-        let valid_task = Arc::clone(&valid);
+        let valid_task = valid.clone();
 
         tokio::spawn(async move {
-            while let Some((line_number, path, class)) = receiver.recv().await {
+            while let Some(event) = receiver.recv().await {
                 if valid_task.load(Ordering::Relaxed) {
                     valid_task.swap(false, Ordering::Relaxed);
                 }
 
                 if !quiet {
-                    let path = format!("{}:{line_number}", path.to_string_lossy());
+                    let mut path = event.path.to_string_lossy().into_owned();
+                    if let Some(line_number) = event.line_number {
+                        path.push(':');
+                        path.push_str(line_number.to_string().as_str());
+                    }
                     eprintln!(
-                        "\"{class}\" in \"\u{1b}]8;i;file://{path}\u{1b}\\{path}\u{1b}]8;;\u{1b}\\\""
+                        "\"{}\" in \"\u{1b}]8;i;file://{path}\u{1b}\\{path}\u{1b}]8;;\u{1b}\\\"",
+                        event.class
                     );
                 }
             }

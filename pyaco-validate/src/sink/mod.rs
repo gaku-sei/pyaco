@@ -14,4 +14,23 @@ pub trait Sink {
     async fn done(self) -> bool;
 }
 
-pub type SearchFileEvent = (u64, PathBuf, CompactString);
+pub struct SearchFileEvent {
+    pub line_number: Option<u64>,
+    pub path: PathBuf,
+    pub class: CompactString,
+}
+
+impl SearchFileEvent {
+    pub fn new(path: impl Into<PathBuf>, class: impl Into<CompactString>) -> Self {
+        Self {
+            line_number: None,
+            path: path.into(),
+            class: class.into(),
+        }
+    }
+
+    pub fn with_line_number(mut self, line_number: u64) -> Self {
+        self.line_number = Some(line_number);
+        self
+    }
+}

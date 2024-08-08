@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
+    u64,
 };
 
 use clap::Parser as ClapParser;
@@ -83,8 +84,8 @@ pub async fn run(options: Options) -> Result<()> {
     run_once(
         glob(glob_pattern.as_str())?.filter_map(std::result::Result::ok),
         &css_input,
-        Arc::clone(&capture_regex),
-        Arc::clone(&split_regex),
+        capture_regex.clone(),
+        split_regex.clone(),
         options.max_opened_files,
         options.quiet,
     )
@@ -110,8 +111,8 @@ pub async fn run(options: Options) -> Result<()> {
                     run_once(
                         glob(glob_pattern.as_str())?.filter_map(std::result::Result::ok),
                         &css_input,
-                        Arc::clone(&capture_regex),
-                        Arc::clone(&split_regex),
+                        capture_regex.clone(),
+                        split_regex.clone(),
                         options.max_opened_files,
                         options.quiet,
                     )
@@ -142,20 +143,19 @@ async fn run_once(
 
     stream::iter(paths)
         .map(|path| {
-            let capture_regex = Arc::clone(&capture_regex);
-            let split_regex = Arc::clone(&split_regex);
-            let allowed_classes = Arc::clone(&allowed_classes);
+            let capture_regex = capture_regex.clone();
+            let split_regex = split_regex.clone();
+            let allowed_classes = allowed_classes.clone();
             let mut sink = sink.clone();
 
             tokio::spawn(async move {
                 report_unknown_classes(
                     &allowed_classes,
-                    dunce::canonicalize(path)?,
-                    Arc::as_ref(&capture_regex),
-                    Arc::as_ref(&split_regex),
+                    &dunce::canonicalize(path)?,
+                    &capture_regex,
+                    &split_regex,
                     &mut sink,
                 )
-                .await
             })
         })
         .buffer_unordered(max_opened_files)
@@ -177,9 +177,9 @@ async fn run_once(
 }
 
 #[allow(clippy::missing_errors_doc)]
-pub async fn report_unknown_classes<R, S>(
+pub fn report_unknown_classes<R, S>(
     allowed_classes: &HashSet<CompactString, R>,
-    path: PathBuf,
+    path: &Path,
     capture_regex: &RegexMatcher,
     split_regex: &Regex,
     sink: &mut S,
@@ -190,29 +190,28 @@ where
 {
     // TODO: We may be able to reuse the same searcher for all the files?
     let mut searcher = SearcherBuilder::new().multi_line(true).build();
-    let Ok(file) = open_file(&path).await?.try_into_std() else {
-        unreachable!("file couldn't be converted to std file");
-    };
 
-    searcher.search_file(
+    searcher.search_path(
         capture_regex,
-        &file,
-        UTF8(|line_number, line| {
+        path,
+        UTF8(|_line_number, line| {
             let mut captures = capture_regex.new_captures()?;
 
             // Search for the captures pattern...
-            if capture_regex.captures(line.as_bytes(), &mut captures)? {
+            capture_regex.captures_iter(line.as_bytes(), &mut captures, |captures| {
                 if let Some(m) = captures.get(1) {
                     let classes = &line[m];
 
                     // ... and then split the captured classes
                     for class in split_regex.split(classes) {
                         if !class.is_empty() && !allowed_classes.contains(class) {
-                            sink.send((line_number, path.clone(), class.into()));
+                            sink.send(SearchFileEvent::new(path, class));
                         }
                     }
                 }
-            }
+
+                true
+            })?;
 
             Ok(true)
         }),
