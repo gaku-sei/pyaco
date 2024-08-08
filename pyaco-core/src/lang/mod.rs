@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::HashSet, path::Component, path::Path, str::F
 use askama::Template;
 use async_trait::async_trait;
 use compact_str::CompactString;
+use gleam::Gleam;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -22,6 +23,7 @@ pub use super::typescript_type_1::TypescriptType1;
 pub use super::typescript_type_2::TypescriptType2;
 
 pub mod elm;
+pub mod gleam;
 pub mod purescript;
 pub mod rescript;
 pub mod rescript_type1;
@@ -34,6 +36,7 @@ pub mod typescript_type_2;
 #[serde(rename_all = "kebab-case")]
 pub enum Lang {
     Elm,
+    Gleam,
     Purescript,
     Rescript,
     RescriptType1,
@@ -57,6 +60,13 @@ impl Lang {
 
                 template
                     .write_to_file(&resolve_path(output_directory, output_filename, "elm"))
+                    .await?;
+            }
+            Self::Gleam => {
+                let template = Gleam::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "gleam"))
                     .await?;
             }
             Self::Purescript => {
@@ -126,6 +136,7 @@ impl FromStr for Lang {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "elm" => Ok(Lang::Elm),
+            "gleam" => Ok(Lang::Gleam),
             "purescript" => Ok(Lang::Purescript),
             "rescript" => Ok(Lang::Rescript),
             "rescript-type-1" => Ok(Lang::RescriptType1),
