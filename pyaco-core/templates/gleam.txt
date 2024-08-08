@@ -1,0 +1,33 @@
+import gleam/option.{type Option, None, Some}
+import gleam/list.{fold}
+
+pub type CssClass {
+  {% for class in classes %}{{class|name}}
+  {% endfor %}
+}
+
+pub fn to_string(class: CssClass) -> String {
+  case class {
+    {% for class in classes %}{{class|name}} -> "{{class}}"
+    {% endfor %}
+  }
+}
+
+pub fn join(classes: List(CssClass)) -> String {
+  classes |> fold(from:"", with:fn(acc, class) {
+    case acc {
+      "" -> to_string(class)
+      acc -> acc <> " " <> to_string(class)
+    }
+  })
+}
+
+pub fn join_opt(classes: List(Option(CssClass))) -> String {
+  classes |> fold(from:"", with:fn(acc, class) {
+    case class {
+      Some(class) if acc == "" -> to_string(class)
+      Some(class) -> acc <> " " <> to_string(class)
+      None -> acc
+    }
+  })
+}

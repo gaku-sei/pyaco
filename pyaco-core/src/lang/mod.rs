@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::HashSet, path::Component, path::Path, str::F
 use askama::Template;
 use async_trait::async_trait;
 use compact_str::CompactString;
+use gleam::Gleam;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -15,15 +16,18 @@ pub use super::elm::Elm;
 pub use super::purescript::Purescript;
 pub use super::rescript::Rescript;
 pub use super::rescript::Rescripti;
-pub use super::rescript_type::RescriptType;
+pub use super::rescript_type1::RescriptType1;
+pub use super::rescript_type2::RescriptType2;
 pub use super::typescript::Typescript;
 pub use super::typescript_type_1::TypescriptType1;
 pub use super::typescript_type_2::TypescriptType2;
 
 pub mod elm;
+pub mod gleam;
 pub mod purescript;
 pub mod rescript;
-pub mod rescript_type;
+pub mod rescript_type1;
+pub mod rescript_type2;
 pub mod typescript;
 pub mod typescript_type_1;
 pub mod typescript_type_2;
@@ -32,9 +36,11 @@ pub mod typescript_type_2;
 #[serde(rename_all = "kebab-case")]
 pub enum Lang {
     Elm,
+    Gleam,
     Purescript,
     Rescript,
-    RescriptType,
+    RescriptType1,
+    RescriptType2,
     Typescript,
     TypescriptType1,
     TypescriptType2,
@@ -54,6 +60,13 @@ impl Lang {
 
                 template
                     .write_to_file(&resolve_path(output_directory, output_filename, "elm"))
+                    .await?;
+            }
+            Self::Gleam => {
+                let template = Gleam::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "gleam"))
                     .await?;
             }
             Self::Purescript => {
@@ -76,8 +89,15 @@ impl Lang {
                     .write_to_file(&resolve_path(output_directory, output_filename, "resi"))
                     .await?;
             }
-            Self::RescriptType => {
-                let template = RescriptType::new(output_directory, output_filename, classes)?;
+            Self::RescriptType1 => {
+                let template = RescriptType1::new(output_directory, output_filename, classes)?;
+
+                template
+                    .write_to_file(&resolve_path(output_directory, output_filename, "res"))
+                    .await?;
+            }
+            Self::RescriptType2 => {
+                let template = RescriptType2::new(output_directory, output_filename, classes)?;
 
                 template
                     .write_to_file(&resolve_path(output_directory, output_filename, "res"))
@@ -116,9 +136,11 @@ impl FromStr for Lang {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "elm" => Ok(Lang::Elm),
+            "gleam" => Ok(Lang::Gleam),
             "purescript" => Ok(Lang::Purescript),
             "rescript" => Ok(Lang::Rescript),
-            "rescript-type" => Ok(Lang::RescriptType),
+            "rescript-type-1" => Ok(Lang::RescriptType1),
+            "rescript-type-2" => Ok(Lang::RescriptType2),
             "typescript" => Ok(Lang::Typescript),
             "typescript-type-1" => Ok(Lang::TypescriptType1),
             "typescript-type-2" => Ok(Lang::TypescriptType2),
